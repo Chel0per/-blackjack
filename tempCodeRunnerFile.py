@@ -1,1 +1,2 @@
-self.animating = True
+
+stack_sprites = pygame.sprite.Group()
