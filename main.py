@@ -146,7 +146,19 @@ class CardStack(pygame.sprite.Sprite):
         self.suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
         self.values = ['Ace', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King']
         self.cards:List[Card] = []
-        self.back_image = pygame.image.load("images/GeneralDesign/back.png")
+        self.animating = False
+        self.repeat = 0
+        self.sprites = []
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_0.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_1.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_2.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_3.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_5.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_6.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_7.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_8.png"))
+        self.sprites.append(pygame.image.load("images/GeneralDesign/shuffle_animation_0.png")) 
+        self.current_sprite = 0
         self.empty_image = pygame.image.load("images/GeneralDesign/empty_stack.png")
         self.image = self.empty_image
         self.rect = self.image.get_rect()
@@ -154,14 +166,14 @@ class CardStack(pygame.sprite.Sprite):
 
     def add_pack(self):
         if len(self.cards) == 0:
-            self.image = self.back_image
+            self.image = self.sprites[0]
         for suit in self.suits:
             for value in self.values:
                 self.cards.append(Card(suit,value))
 
     def add_card(self,card:Card):
         if len(self.cards) == 0:
-            self.image = self.back_image
+            self.image = self.sprites[0]
         self.cards.append(card)
 
     def draw_card(self) -> Card:
@@ -176,13 +188,26 @@ class CardStack(pygame.sprite.Sprite):
     def shuffle(self):
         random.shuffle(self.cards)
 
+    def update(self):
+        self.image = self.sprites[int(self.current_sprite)]
+        self.current_sprite += 0.25
+        if self.current_sprite > len(self.sprites) - 1:
+            if self.repeat > 0:
+                self.repeat -= 1
+                self.current_sprite = 0
+            else:
+                self.current_sprite = 0
+                self.animating = False
+
+    def animate(self,repeat:int):
+        self.animating = True
+        self.repeat = repeat
+
     def empty(self):
         self.cards = []
         self.image = self.empty_image
     
     def merge(self,other_stack:CardStack):
-        if len(self.cards) == 0:
-            return None
         self.cards.extend(other_stack.cards)
         other_stack.empty()
 
@@ -233,7 +258,9 @@ class Button(pygame.sprite.Sprite):
         self.to_end_busted_round = False
         self.to_start_round = False
         self.to_stand = False
+        self.to_shuffle = False
         self.skip_next_instruction = False
+        self.round_cards = []
         self.content = content
         self.delay_time = 0
         self.delay_target = 0
@@ -273,24 +300,50 @@ class Button(pygame.sprite.Sprite):
                 self.to_enable = False
 
             if self.to_start_round:
-                card_sprites.empty()
-                self.game.start_round()
-                self.to_start_round = False
+                if not self.to_shuffle:
+                    self.game.discard_stack.cards.extend(self.round_cards)
+                    if len(self.game.discard_stack.cards) > 0:
+                        self.game.discard_stack.image = self.game.discard_stack.sprites[0]
+                    self.round_cards = []                     
+                    card_sprites.empty()
+                    self.game.start_round()
+                    self.to_start_round = False
+                else:
+                    card_sprites.empty()
+                    self.to_shuffle = False
+                    self.game.game_stack.animate(2)
+                    self.add_delay(120)
 
             if self.to_stand:
                 self.add_delay(self.game.stand() + 120)
                 self.to_end_busted_round = True
                 self.to_stand = False
                 self.skip_next_instruction = True
+
+            if self.to_shuffle:
+                for card in self.round_cards:
+                    card.toggle_movement(640,60,40)
+                self.game.discard_stack.cards.extend(self.round_cards)
+                for card in self.game.discard_stack.cards:
+                    self.game.game_stack.add_card(Card(card.suit,card.value))
+                self.round_cards = []
+                self.game.discard_stack.empty()
+                self.game.game_stack.shuffle()
+                self.to_start_round = True
+                self.add_delay(40)
                 
             if self.to_end_busted_round and not self.skip_next_instruction:
                 self.to_end_busted_round = False
-                self.game.end_round("busted")
-                self.add_delay(40)
-                self.to_start_round = True
+                if len(self.game.game_stack.cards) > 108:
+                    self.to_start_round = True
+                else:
+                    self.to_shuffle = True
+                
+                self.round_cards = self.game.end_round("busted")
+                self.add_delay(40)    
                 player_hand_value.add_changes(
                     [{
-                        "type":"text",
+                       "type":"text",
                         "value":"",
                         "delay":0
                     },
@@ -311,7 +364,7 @@ class Button(pygame.sprite.Sprite):
                         "value":(255,255,255),
                         "delay":0
                     }]
-                ) 
+                )
             elif self.skip_next_instruction:
                 self.skip_next_instruction = False
 
@@ -326,6 +379,11 @@ class Button(pygame.sprite.Sprite):
                             self.group.sprites()[0].enable(40)
                             self.group.sprites()[1].enable(40)
                             self.group.sprites()[2].enable(40)
+                        elif game.player_hand.value == 21:
+                            self.game.dealer_hand.cards[1].set_delay(40)
+                            self.game.dealer_hand.cards[1].toggle_flip()
+                            self.add_delay(80)
+                            self.to_stand = True
                         else:
                             self.add_delay(120)                  
                             self.to_end_busted_round = True
@@ -456,12 +514,17 @@ class Game:
             hit_button.enable(100)
             stand_button.enable(100)
             double_button.enable(100)
+        elif game.player_hand.value == 21:
+            hit_button.game.dealer_hand.cards[1].set_delay(40)
+            hit_button.game.dealer_hand.cards[1].toggle_flip()
+            hit_button.add_delay(140)
+            hit_button.to_stand = True
         else:
             hit_button.to_end_busted_round = True
             hit_button.skip_next_instruction = True
             hit_button.add_delay(220) 
      
-        if game.player_hand.cards[0].blackjack_value == game.player_hand.cards[1].blackjack_value:
+        if game.player_hand.cards[0].blackjack_value == game.player_hand.cards[1].blackjack_value or (game.player_hand.cards[1].value == "Ace" and game.player_hand.cards[0].value == "Ace"):
             split_button.enable(100)
 
     def hit(self):
@@ -505,16 +568,19 @@ class Game:
 
         return card_delay        
 
-    def end_round(self,state:str):
+    def end_round(self,state:str) -> List[Card]:
         match state:
             case "busted":
+
+                round_card_stack = []
+
                 for card in self.player_hand.cards:
                     card.toggle_flip()
                     card.toggle_movement(110,60,40)
                     if card.value == "Ace":
                         card.blackjack_value = 11
                         card.can_change_value = True
-                    self.discard_stack.add_card(card)
+                    round_card_stack.append(card)
 
                 self.player_hand.empty()
 
@@ -525,9 +591,11 @@ class Game:
                     if card.value == "Ace":
                         card.blackjack_value = 11
                         card.can_change_value = True
-                    self.discard_stack.add_card(card)
+                    round_card_stack.append(card)
 
                 self.dealer_hand.empty()
+
+                return round_card_stack
 
 pygame.init()
 
@@ -549,8 +617,8 @@ display_sprites = pygame.sprite.Group()
 display_sprites.add(dealer_hand_value)
 display_sprites.add(player_hand_value)
 
-game_stack = CardStack(640,60)
-discard_stack = CardStack(110,60)
+game_stack = CardStack(615,60)
+discard_stack = CardStack(85,60)
 stack_sprites = pygame.sprite.Group()
 stack_sprites.add(game_stack)
 stack_sprites.add(discard_stack)
@@ -585,6 +653,8 @@ def main():
         button_sprites.update()
         card_sprites.update()
         display_sprites.update()
+        if game_stack.animating:
+            game_stack.update()
         pygame.display.flip()
         clock.tick(60)
 
