@@ -1,9 +1,7 @@
 from __future__ import annotations
 from typing import List
 import pygame
-import time 
 import random
-import sys
 
 class Card(pygame.sprite.Sprite):
 
@@ -249,6 +247,220 @@ class Hand:
                 self.cards[i].add_delayed_animation(pos_x,100,40,(n - 3)*40)
             pos_x += 54
 
+class Chip(pygame.sprite.Sprite):
+    def __init__(self,value:int,pos_x:int,pos_y:int):
+        super().__init__()
+        self.value = value
+        self.clickable = False
+        self.withdrawable = False
+        self.to_be_withdrawable = False
+        self.to_be_erased = False
+        self.on_top = False
+        self.to_teleport = False
+        self.delay_target = 0
+        self.delay_time = 0
+        self.enabled_image = pygame.image.load(f"images/GeneralDesign/casino_coin_{self.value}.png")
+        self.disabled_image = pygame.image.load(f"images/GeneralDesign/casino_coin_empty.png")
+        self.image = self.enabled_image
+        self.rect = self.image.get_rect()
+        self.rect.topleft = [pos_x,pos_y]
+
+        self.top_destination = pos_y
+        self.left_destination = pos_x
+        self.float_top = pos_y
+        self.float_left = pos_x
+        self.x_speed = 0
+        self.y_speed = 0
+
+    def hide(self):
+        self.image = self.disabled_image
+        self.clickable = False
+
+    def show(self):
+        self.image = self.enabled_image
+        self.clickable = True
+
+    def acoplate_number(self):
+        self.number = pygame.sprite.Sprite()
+        self.number.unhovered_image = pygame.image.load(f"images/GeneralDesign/{self.value}.png")
+        self.number.hovered_image = pygame.image.load(f"images/GeneralDesign/{self.value}_hovered.png")
+        self.number.image = self.number.unhovered_image
+        self.number.rect = self.number.image.get_rect()
+        self.number.rect.topleft = [self.rect.left - 8,self.rect.top + 25]
+        number_sprites.add(self.number)
+
+    def track_clicking(self):
+        mouse_pos = pygame.mouse.get_pos()
+        if self.rect.collidepoint(mouse_pos):
+            self.number.image = self.number.hovered_image
+            if pygame.mouse.get_pressed()[0] == 1 and self.clickable:
+                self.clickable = False
+                if wallet.value >= self.value:
+                    wallet.put_on_bet(self.value)
+                    new_chip = Chip(self.value,self.rect.left,self.rect.top)
+                    match new_chip.value:
+                        case 50:
+                            bet.chips_group_50.add(new_chip)
+                            new_chip.toggle_movement(350,223,20)
+                            new_chip.to_be_withdrawable = True
+                        case 100:
+                            bet.chips_group_100.add(new_chip)
+                            new_chip.toggle_movement(376,223,20)
+                            new_chip.to_be_withdrawable = True
+                        case 500:
+                            bet.chips_group_500.add(new_chip)
+                            new_chip.toggle_movement(402,223,20)
+                            new_chip.to_be_withdrawable = True
+                        case 1000:
+                            bet.chips_group_1000.add(new_chip)
+                            new_chip.toggle_movement(428,223,20)
+                            new_chip.to_be_withdrawable = True
+
+        else:
+            self.number.image = self.number.unhovered_image
+
+        if pygame.mouse.get_pressed()[0] == 0 and not self.clickable:
+            self.clickable = True
+
+    def toggle_movement(self,left:int,top:int,time:int):
+        self.top_destination = top
+        self.float_top = self.rect.top
+        self.y_speed = (self.top_destination - self.rect.top)/time
+        self.left_destination = left
+        self.float_left = self.rect.left
+        self.x_speed = (self.left_destination - self.rect.left)/time
+
+    def teleport(self):
+        match self.value:
+            case 50:
+                self.top_destination = 223
+                self.float_top = 223
+                self.rect.top = 223
+                self.left_destination = 350
+                self.float_left = 350
+                self.rect.left = 350
+            case 100:
+                self.top_destination = 223
+                self.float_top = 223
+                self.rect.top = 223
+                self.left_destination = 376
+                self.float_left = 376
+                self.rect.left = 376
+            case 500:
+                self.top_destination = 223
+                self.float_top = 223
+                self.rect.top = 223
+                self.left_destination = 402
+                self.float_left = 402
+                self.rect.left = 402
+            case 1000:
+                self.top_destination = 223
+                self.float_top = 223
+                self.rect.top = 223
+                self.left_destination = 428
+                self.float_left = 428
+                self.rect.left = 428
+
+    def update(self):
+        if self.delay_target != self.delay_time:
+            self.delay_time += 1
+        else:
+            self.delay_target = 0
+            self.delay_time = 0
+            
+            if self.rect.top != self.top_destination:   
+                self.float_top += self.y_speed
+                self.rect.top = round(self.float_top)
+
+            if self.rect.left != self.left_destination:
+                self.float_left += self.x_speed
+                self.rect.left = round(self.float_left)
+                if self.rect.left == self.left_destination and self.to_be_withdrawable:
+                    self.to_be_withdrawable = False
+                    match self.value:
+                        case 50:
+                            for chip in bet.chips_group_50:
+                                chip.on_top = False
+                        case 100:
+                            for chip in bet.chips_group_100:
+                                chip.on_top = False
+                        case 500:
+                            for chip in bet.chips_group_500:
+                                chip.on_top = False
+                        case 1000:
+                            for chip in bet.chips_group_1000:
+                                chip.on_top = False
+                    self.withdrawable = True
+                    self.clickable = True
+                    self.on_top = True
+                elif self.rect.left == self.left_destination and self.to_be_erased:
+                    self.to_be_erased = False
+                    match self.value:
+                        case 50:
+                            bet.chips_group_50.remove(self)
+                        case 100:
+                            bet.chips_group_100.remove(self)
+                        case 500:
+                            bet.chips_group_500.remove(self)
+                        case 1000:
+                            bet.chips_group_1000.remove(self)
+                elif self.rect.left == self.left_destination and self.to_teleport:
+                    self.to_teleport = False
+                    self.teleport()
+            
+            if self.withdrawable:  
+                mouse_pos = pygame.mouse.get_pos()
+                if pygame.mouse.get_pressed()[0] == 1:
+                    if self.clickable and self.rect.collidepoint(mouse_pos) and self.on_top:
+                        wallet.remove_from_bet(self.value)
+                        self.to_be_withdrawable = False
+                        self.clickable = False
+                        match self.value:
+                            case 50:
+                                self.toggle_movement(299,295,10)
+                                if len(bet.chips_group_50) > 1:
+                                    any_chip = None
+                                    for chip in bet.chips_group_50:
+                                        if chip.on_top:
+                                            chip.on_top = False
+                                            if any_chip:
+                                                any_chip.on_top = True
+                                        any_chip = chip
+                            case 100:
+                                self.toggle_movement(359,295,10)
+                                if len(bet.chips_group_100) > 1:
+                                    any_chip = None
+                                    for chip in bet.chips_group_100:
+                                        if chip.on_top:
+                                            chip.on_top = False
+                                            if any_chip:
+                                                any_chip.on_top = True
+                                        any_chip = chip
+                            case 500:
+                                self.toggle_movement(419,295,10)
+                                if len(bet.chips_group_500) > 1:
+                                    any_chip = None
+                                    for chip in bet.chips_group_500:
+                                        if chip.on_top:
+                                            chip.on_top = False
+                                            if any_chip:
+                                                any_chip.on_top = True
+                                        any_chip = chip
+                            case 1000:
+                                self.toggle_movement(479,295,10)
+                                if len(bet.chips_group_1000) > 1:
+                                    any_chip = None
+                                    for chip in bet.chips_group_1000:
+                                        if chip.on_top:
+                                            chip.on_top = False
+                                            if any_chip:
+                                                any_chip.on_top = True
+                                        any_chip = chip
+                        self.to_be_erased = True
+                    self.clickable = False
+                elif pygame.mouse.get_pressed()[0] == 0 and not game.game_on_round:
+                    self.clickable = True
+
 class Button(pygame.sprite.Sprite):
     def __init__(self,pos_x:int,pos_y:int,content:str,group:pygame.sprite.Group,game:Game):
         super().__init__()
@@ -260,11 +472,15 @@ class Button(pygame.sprite.Sprite):
         self.to_stand = False
         self.to_shuffle = False
         self.skip_next_instruction = False
+        self.to_end_bet = False
         self.round_cards = []
         self.content = content
         self.delay_time = 0
         self.delay_target = 0
-        self.empty_image = pygame.image.load("images/Buttons/empty_button.png")
+        if self.content == "start_round":
+            self.empty_image = pygame.image.load("images/Buttons/empty_large_button.png")
+        else:
+            self.empty_image = pygame.image.load("images/Buttons/empty_button.png")
         self.unhovered_image = pygame.image.load(f"images/Buttons/{self.content}_button.png")
         self.hovered_image = pygame.image.load(f"images/Buttons/{self.content}_button_hovered.png")
         self.image = self.empty_image
@@ -306,8 +522,10 @@ class Button(pygame.sprite.Sprite):
                         self.game.discard_stack.image = self.game.discard_stack.sprites[0]
                     self.round_cards = []                     
                     card_sprites.empty()
-                    self.game.start_round()
                     self.to_start_round = False
+                    start_round_button.enable(0)
+                    betting_table.enable()
+                    game.game_on_round = False
                 else:
                     card_sprites.empty()
                     self.to_shuffle = False
@@ -317,10 +535,13 @@ class Button(pygame.sprite.Sprite):
             if self.to_stand:
                 self.add_delay(self.game.stand() + 120)
                 self.to_end_busted_round = True
+                game.hands[0] = player_hand.value
+                game.hands[1] = dealer_hand.value
                 self.to_stand = False
                 self.skip_next_instruction = True
 
             if self.to_shuffle:
+                print("shuffle")
                 for card in self.round_cards:
                     card.toggle_movement(640,60,40)
                 self.game.discard_stack.cards.extend(self.round_cards)
@@ -331,13 +552,94 @@ class Button(pygame.sprite.Sprite):
                 self.game.game_stack.shuffle()
                 self.to_start_round = True
                 self.add_delay(40)
-                
-            if self.to_end_busted_round and not self.skip_next_instruction:
-                self.to_end_busted_round = False
+
+            if self.to_end_bet:
+                self.to_end_bet = False
                 if len(self.game.game_stack.cards) > 108:
                     self.to_start_round = True
                 else:
                     self.to_shuffle = True
+                
+                if game.hands[0] > 21:
+                    for chip in bet.chips_group_50:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_100:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_500:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_1000:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    self.add_delay(40)
+                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                    bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                    wallet.value -= bet.value
+                    wallet.display.add_delay(40)
+                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
+                elif game.hands[1] > 21:
+                    for chip in bet.chips_group_50:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_100:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_500:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_1000:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    self.add_delay(40)
+                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                    bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                    wallet.value += bet.value
+                    wallet.display.add_delay(40)
+                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
+                elif game.hands[0] < game.hands[1]:
+                    for chip in bet.chips_group_50:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_100:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_500:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_1000:
+                        chip.toggle_movement(389,-100,40)
+                        chip.to_teleport = True
+                    self.add_delay(40)
+                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                    bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                    wallet.value -= bet.value
+                    wallet.display.add_delay(40)
+                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
+                elif game.hands[0] > game.hands[1]:
+                    for chip in bet.chips_group_50:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_100:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_500:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    for chip in bet.chips_group_1000:
+                        chip.toggle_movement(-80,660,40)
+                        chip.to_teleport = True
+                    self.add_delay(40)
+                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                    bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                    wallet.value += bet.value
+                    wallet.display.add_delay(40)
+                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
+                
+            if self.to_end_busted_round and not self.skip_next_instruction:
+                self.to_end_busted_round = False
+                self.to_end_bet = True
                 
                 self.round_cards = self.game.end_round("busted")
                 self.add_delay(40)    
@@ -387,12 +689,19 @@ class Button(pygame.sprite.Sprite):
                         else:
                             self.add_delay(120)                  
                             self.to_end_busted_round = True
+                            game.hands[0] = player_hand.value
+                            game.hands[1] = dealer_hand.value
                     elif pygame.mouse.get_pressed()[0] == 1 and self.content == "stand":
                         for sprite in self.group:
                             sprite.disable()
                         self.game.dealer_hand.cards[1].toggle_flip()
                         self.add_delay(40)
                         self.to_stand = True
+                    elif pygame.mouse.get_pressed()[0] == 1 and self.content == "start_round":
+                        if bet.value > 0:
+                            self.disable()
+                            betting_table.disable()
+                            self.game.start_round()
 
             else:
                 if self.enabled:
@@ -404,7 +713,6 @@ class Display(pygame.sprite.Sprite):
         super().__init__()
         self.delay_time = 0
         self.delay_target = 0
-        self.to_change = False
         self.change_queue = []
         self.text = text
         self.font = font
@@ -447,12 +755,69 @@ class Display(pygame.sprite.Sprite):
     def add_changes(self,changes):
         self.change_queue.insert(0,changes)
 
+class BettingTable(pygame.sprite.Sprite):
+    def __init__(self,pos_x:int,pos_y:int):
+        super().__init__()
+        self.enabled = False
+        self.image = pygame.image.load("images/GeneralDesign/betting_square.png")
+        self.rect = self.image.get_rect()
+        self.rect.topleft = [pos_x,pos_y]
+
+        self.chip_group = pygame.sprite.Group()
+        self.chip_50 = Chip(50,self.rect.left + 22,self.rect.top + 15)
+        self.chip_50.acoplate_number()
+        self.chip_100 = Chip(100,self.rect.left + 82,self.rect.top + 15)
+        self.chip_100.acoplate_number()
+        self.chip_500 = Chip(500,self.rect.left + 142,self.rect.top + 15)
+        self.chip_500.acoplate_number()
+        self.chip_1000 = Chip(1000,self.rect.left + 202,self.rect.top + 15)
+        self.chip_1000.acoplate_number()
+        self.chip_group.add(self.chip_50,self.chip_100,self.chip_500,self.chip_1000)
+
+    def draw_chips(self):
+        self.chip_group.draw(WIN)
+
+    def enable(self):
+        self.enabled = True
+
+    def disable(self):
+        self.enabled = False
+
+class Bet:
+    def __init__(self,font,color,pos_x,pos_y):
+        self.value = 0
+        self.chips_group_50 = pygame.sprite.Group()
+        self.chips_group_100 = pygame.sprite.Group()
+        self.chips_group_500 = pygame.sprite.Group()
+        self.chips_group_1000 = pygame.sprite.Group()
+        self.display = Display(f"$ {self.value}",font,color,pos_x,pos_y)
+
+class Wallet:
+    def __init__(self,font,color,pos_x,pos_y):
+        self.value = 50000
+        self.display = Display(f"$ {self.value}",font,color,pos_x,pos_y)
+
+    def put_on_bet(self,amount:int):
+        self.value -= amount
+        self.display.change_text(f"$ {self.value}")
+        bet.value += amount
+        bet.display.change_text(f"$ {bet.value}")
+
+    def remove_from_bet(self,amount:int):
+        self.value += amount
+        self.display.change_text(f"$ {self.value}")
+        bet.value -= amount
+        bet.display.change_text(f"$ {bet.value}")
+
 class Game:
+
     def __init__(self,player_hand:Hand,dealer_hand:Hand,game_stack:CardStack,discard_stack:CardStack):
         self.player_hand = player_hand
         self.dealer_hand = dealer_hand
         self.game_stack = game_stack
         self.discard_stack = discard_stack
+        self.game_on_round = False
+        self.hands = [0,0]
 
         self.game_stack.add_pack()
         self.game_stack.add_pack()
@@ -461,6 +826,15 @@ class Game:
         self.game_stack.shuffle()
 
     def start_round(self):
+        self.game_on_round = True
+        for chip in bet.chips_group_50:
+            chip.clickable = False
+        for chip in bet.chips_group_100:
+            chip.clickable = False
+        for chip in bet.chips_group_500:
+            chip.clickable = False
+        for chip in bet.chips_group_1000:
+            chip.clickable = False
         card1 = self.game_stack.draw_card()
         card_sprites.add(card1)
         card1.toggle_flip()
@@ -521,6 +895,8 @@ class Game:
             hit_button.to_stand = True
         else:
             hit_button.to_end_busted_round = True
+            game.hands[0] = player_hand.value
+            game.hands[1] = dealer_hand.value
             hit_button.skip_next_instruction = True
             hit_button.add_delay(220) 
      
@@ -577,9 +953,6 @@ class Game:
                 for card in self.player_hand.cards:
                     card.toggle_flip()
                     card.toggle_movement(110,60,40)
-                    if card.value == "Ace":
-                        card.blackjack_value = 11
-                        card.can_change_value = True
                     round_card_stack.append(card)
 
                 self.player_hand.empty()
@@ -588,9 +961,6 @@ class Game:
                     if card.face_up:
                         card.toggle_flip()
                     card.toggle_movement(110,60,40)
-                    if card.value == "Ace":
-                        card.blackjack_value = 11
-                        card.can_change_value = True
                     round_card_stack.append(card)
 
                 self.dealer_hand.empty()
@@ -607,6 +977,11 @@ clock = pygame.time.Clock()
 pygame.display.set_caption("Blackjack")
 
 background = pygame.image.load("images/GeneralDesign/table.png")
+number_sprites = pygame.sprite.Group()
+betting_table = BettingTable(277,280)
+betting_table_sprites = pygame.sprite.Group()
+betting_table_sprites.add(betting_table)
+betting_table.enable()
 
 card_sprites = pygame.sprite.Group()
 
@@ -616,6 +991,10 @@ dealer_hand_value = Display("",pygame.font.SysFont("Arial",24),(255,255,255),390
 display_sprites = pygame.sprite.Group()
 display_sprites.add(dealer_hand_value)
 display_sprites.add(player_hand_value)
+wallet = Wallet(pygame.font.SysFont("Arial",24),(255,255,255),20,560)
+display_sprites.add(wallet.display)
+bet = Bet(pygame.font.SysFont("Arial",24),(255,255,255),455,220)
+display_sprites.add(bet.display)
 
 game_stack = CardStack(615,60)
 discard_stack = CardStack(85,60)
@@ -633,6 +1012,9 @@ hit_button = Button(485,470,"hit",button_sprites,game)
 stand_button = Button(237,470,"stand",button_sprites,game)
 double_button = Button(485,511,"double",button_sprites,game)
 split_button = Button(237,511,"split",button_sprites,game)
+start_round_button = Button(277,343,"start_round",button_sprites,game)
+
+start_round_button.enabled = True
 
 def main():
     run = True
@@ -643,12 +1025,23 @@ def main():
                 run = False
                 break
 
-            if event.type == pygame.KEYDOWN:
-                game.start_round()
-
         WIN.blit(background, (0, 0))
         stack_sprites.draw(WIN)
         card_sprites.draw(WIN)
+        if betting_table.enabled:
+            for chip in betting_table.chip_group:
+                chip.track_clicking()
+            betting_table_sprites.draw(WIN)
+            betting_table.draw_chips()
+            number_sprites.draw(WIN)
+        bet.chips_group_50.draw(WIN)
+        bet.chips_group_50.update()
+        bet.chips_group_100.draw(WIN)
+        bet.chips_group_100.update()
+        bet.chips_group_500.draw(WIN)
+        bet.chips_group_500.update()
+        bet.chips_group_1000.draw(WIN)
+        bet.chips_group_1000.update()
         button_sprites.draw(WIN)
         button_sprites.update()
         card_sprites.update()
