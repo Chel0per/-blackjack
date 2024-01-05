@@ -254,6 +254,7 @@ class Chip(pygame.sprite.Sprite):
         self.clickable = False
         self.withdrawable = False
         self.to_be_withdrawable = False
+        self.to_desactivate_double = False
         self.to_be_erased = False
         self.on_top = False
         self.to_teleport = False
@@ -271,6 +272,9 @@ class Chip(pygame.sprite.Sprite):
         self.float_left = pos_x
         self.x_speed = 0
         self.y_speed = 0
+
+    def add_delay(self,value:int):
+        self.delay_target += value
 
     def hide(self):
         self.image = self.disabled_image
@@ -394,19 +398,13 @@ class Chip(pygame.sprite.Sprite):
                     self.clickable = True
                     self.on_top = True
                 elif self.rect.left == self.left_destination and self.to_be_erased:
-                    self.to_be_erased = False
-                    match self.value:
-                        case 50:
-                            bet.chips_group_50.remove(self)
-                        case 100:
-                            bet.chips_group_100.remove(self)
-                        case 500:
-                            bet.chips_group_500.remove(self)
-                        case 1000:
-                            bet.chips_group_1000.remove(self)
+                    self.kill()
                 elif self.rect.left == self.left_destination and self.to_teleport:
                     self.to_teleport = False
                     self.teleport()
+                elif self.rect.left == self.left_destination and self.to_desactivate_double:
+                    self.to_desactivate_double = False
+                    bet.doubled = False
             
             if self.withdrawable:  
                 mouse_pos = pygame.mouse.get_pos()
@@ -541,7 +539,6 @@ class Button(pygame.sprite.Sprite):
                 self.skip_next_instruction = True
 
             if self.to_shuffle:
-                print("shuffle")
                 for card in self.round_cards:
                     card.toggle_movement(640,60,40)
                 self.game.discard_stack.cards.extend(self.round_cards)
@@ -561,81 +558,347 @@ class Button(pygame.sprite.Sprite):
                     self.to_shuffle = True
                 
                 if game.hands[0] > 21:
-                    for chip in bet.chips_group_50:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_100:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_500:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_1000:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    self.add_delay(40)
-                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
-                    bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
-                    wallet.value -= bet.value
-                    wallet.display.add_delay(40)
-                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
+                    if bet.doubled:
+                        for chip in bet.chips_group_50:
+                            chip.add_delay(20)
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.add_delay(20)                            
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.add_delay(20)
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.add_delay(20)
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        bet.chip_double_50.toggle_movement(389,-100,40)
+                        bet.chip_double_50.to_desactivate_double = True
+                        bet.chip_double_100.toggle_movement(389,-100,40)
+                        bet.chip_double_500.toggle_movement(389,-100,40)
+                        bet.chip_double_1000.toggle_movement(389,-100,40)
+                        self.add_delay(60)
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":20}])
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        wallet.value -= bet.value
+                        if wallet.value < 0:
+                            counter_1000 = 0
+                            counter_500 = 0
+                            counter_100 = 0
+                            counter_50 = 0
+                        while wallet.value < 0:
+                            if len(bet.chips_group_1000) > 0:
+                                first_chip = bet.chips_group_1000.sprites()[counter_1000]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 1000
+                                wallet.value += 1000
+                                counter_1000 += 1
+                            elif len(bet.chips_group_500) > 0:
+                                first_chip = bet.chips_group_500.sprites()[counter_500]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 500
+                                wallet.value += 500
+                                counter_500 += 1
+                            elif len(bet.chips_group_100) > 0:
+                                first_chip = bet.chips_group_100.sprites()[counter_100]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 100
+                                wallet.value += 100
+                                counter_100 += 1
+                            elif len(bet.chips_group_50) > 0:
+                                first_chip = bet.chips_group_50.sprites()[counter_50]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 50
+                                wallet.value += 50
+                                counter_50 += 1
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.display.add_delay(60)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])                        
+                    else:
+                        for chip in bet.chips_group_50:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        self.add_delay(40)
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        wallet.value -= bet.value
+                        if wallet.value < 0:
+                            counter_1000 = 0
+                            counter_500 = 0
+                            counter_100 = 0
+                            counter_50 = 0
+                        while wallet.value < 0:
+                            if len(bet.chips_group_1000) > 0:
+                                first_chip = bet.chips_group_1000.sprites()[counter_1000]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 1000
+                                wallet.value += 1000
+                                counter_1000 += 1
+                            elif len(bet.chips_group_500) > 0:
+                                first_chip = bet.chips_group_500.sprites()[counter_500]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 500
+                                wallet.value += 500
+                                counter_500 += 1
+                            elif len(bet.chips_group_100) > 0:
+                                first_chip = bet.chips_group_100.sprites()[counter_100]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 100
+                                wallet.value += 100
+                                counter_100 += 1
+                            elif len(bet.chips_group_50) > 0:
+                                first_chip = bet.chips_group_50.sprites()[counter_50]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 50
+                                wallet.value += 50
+                                counter_50 += 1
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.display.add_delay(40)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])
                 elif game.hands[1] > 21:
-                    for chip in bet.chips_group_50:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_100:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_500:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_1000:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    self.add_delay(40)
-                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
-                    bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
-                    wallet.value += bet.value
-                    wallet.display.add_delay(40)
-                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
+                    if bet.doubled:
+                        for chip in bet.chips_group_50:
+                            chip.add_delay(20)
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.add_delay(20)                            
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.add_delay(20)
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.add_delay(20)
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        bet.chip_double_50.toggle_movement(-80,660,40)
+                        bet.chip_double_50.to_desactivate_double = True
+                        bet.chip_double_100.toggle_movement(-80,660,40)
+                        bet.chip_double_500.toggle_movement(-80,660,40)
+                        bet.chip_double_1000.toggle_movement(-80,660,40)
+                        self.add_delay(60)
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":20}])
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.value += 2*bet.value
+                        wallet.display.add_delay(40)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":20}])
+                        wallet.value += bet.value
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])                        
+                    else:
+                        for chip in bet.chips_group_50:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        self.add_delay(40)
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.value += bet.value
+                        wallet.display.add_delay(40)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])
                 elif game.hands[0] < game.hands[1]:
-                    for chip in bet.chips_group_50:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_100:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_500:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_1000:
-                        chip.toggle_movement(389,-100,40)
-                        chip.to_teleport = True
-                    self.add_delay(40)
-                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
-                    bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
-                    wallet.value -= bet.value
-                    wallet.display.add_delay(40)
-                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
+                    if bet.doubled:
+                        for chip in bet.chips_group_50:
+                            chip.add_delay(20)
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.add_delay(20)                            
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.add_delay(20)
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.add_delay(20)
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        bet.chip_double_50.toggle_movement(389,-100,40)
+                        bet.chip_double_50.to_desactivate_double = True
+                        bet.chip_double_100.toggle_movement(389,-100,40)
+                        bet.chip_double_500.toggle_movement(389,-100,40)
+                        bet.chip_double_1000.toggle_movement(389,-100,40)
+                        self.add_delay(60)
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":20}])
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        wallet.value -= bet.value
+                        if wallet.value < 0:
+                            counter_1000 = 0
+                            counter_500 = 0
+                            counter_100 = 0
+                            counter_50 = 0
+                        while wallet.value < 0:
+                            if len(bet.chips_group_1000) > 0:
+                                first_chip = bet.chips_group_1000.sprites()[counter_1000]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 1000
+                                wallet.value += 1000
+                                counter_1000 += 1
+                            elif len(bet.chips_group_500) > 0:
+                                first_chip = bet.chips_group_500.sprites()[counter_500]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 500
+                                wallet.value += 500
+                                counter_500 += 1
+                            elif len(bet.chips_group_100) > 0:
+                                first_chip = bet.chips_group_100.sprites()[counter_100]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 100
+                                wallet.value += 100
+                                counter_100 += 1
+                            elif len(bet.chips_group_50) > 0:
+                                first_chip = bet.chips_group_50.sprites()[counter_50]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 50
+                                wallet.value += 50
+                                counter_50 += 1
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.display.add_delay(60)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])                        
+                    else:
+                        for chip in bet.chips_group_50:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.toggle_movement(389,-100,40)
+                            chip.to_teleport = True
+                        self.add_delay(40)
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        wallet.value -= bet.value
+                        if wallet.value < 0:
+                            counter_1000 = 0
+                            counter_500 = 0
+                            counter_100 = 0
+                            counter_50 = 0
+                        while wallet.value < 0:
+                            if len(bet.chips_group_1000) > 0:
+                                first_chip = bet.chips_group_1000.sprites()[counter_1000]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 1000
+                                wallet.value += 1000
+                                counter_1000 += 1
+                            elif len(bet.chips_group_500) > 0:
+                                first_chip = bet.chips_group_500.sprites()[counter_500]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 500
+                                wallet.value += 500
+                                counter_500 += 1
+                            elif len(bet.chips_group_100) > 0:
+                                first_chip = bet.chips_group_100.sprites()[counter_100]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 100
+                                wallet.value += 100
+                                counter_100 += 1
+                            elif len(bet.chips_group_50) > 0:
+                                first_chip = bet.chips_group_50.sprites()[counter_50]
+                                first_chip.to_teleport = False
+                                first_chip.to_be_erased = True
+                                bet.value -= 50
+                                wallet.value += 50
+                                counter_50 += 1
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.display.add_delay(40)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])
                 elif game.hands[0] > game.hands[1]:
-                    for chip in bet.chips_group_50:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_100:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_500:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    for chip in bet.chips_group_1000:
-                        chip.toggle_movement(-80,660,40)
-                        chip.to_teleport = True
-                    self.add_delay(40)
-                    bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                    if bet.doubled:
+                        for chip in bet.chips_group_50:
+                            chip.add_delay(20)
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.add_delay(20)                            
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.add_delay(20)
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.add_delay(20)
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        bet.chip_double_50.toggle_movement(-80,660,40)
+                        bet.chip_double_50.to_desactivate_double = True
+                        bet.chip_double_100.toggle_movement(-80,660,40)
+                        bet.chip_double_500.toggle_movement(-80,660,40)
+                        bet.chip_double_1000.toggle_movement(-80,660,40)
+                        self.add_delay(60)
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":20}])
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.value += 2*bet.value
+                        wallet.display.add_delay(40)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":20}])
+                        wallet.value += bet.value
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])                        
+                    else:
+                        for chip in bet.chips_group_50:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_100:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_500:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        for chip in bet.chips_group_1000:
+                            chip.toggle_movement(-80,660,40)
+                            chip.to_teleport = True
+                        self.add_delay(40)
+                        bet.display.add_changes([{"type":"text","value":"","delay":40}])
+                        bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
+                        wallet.value += bet.value
+                        wallet.display.add_delay(40)
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])
+                elif game.hands[0] == game.hands[1]:
+                    if bet.doubled:
+                        bet.doubled = False
+                        wallet.value += bet.value
+                        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])
                     bet.display.add_changes([{"type":"text","value":f"$ {bet.value}","delay":0}])
-                    wallet.value += bet.value
-                    wallet.display.add_delay(40)
-                    wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":40}])
                 
             if self.to_end_busted_round and not self.skip_next_instruction:
                 self.to_end_busted_round = False
@@ -680,7 +943,8 @@ class Button(pygame.sprite.Sprite):
                         if game.player_hand.value < 21:
                             self.group.sprites()[0].enable(40)
                             self.group.sprites()[1].enable(40)
-                            self.group.sprites()[2].enable(40)
+                            if wallet.value >= bet.value:
+                                self.group.sprites()[2].enable(40)
                         elif game.player_hand.value == 21:
                             self.game.dealer_hand.cards[1].set_delay(40)
                             self.game.dealer_hand.cards[1].toggle_flip()
@@ -702,6 +966,20 @@ class Button(pygame.sprite.Sprite):
                             self.disable()
                             betting_table.disable()
                             self.game.start_round()
+                    elif pygame.mouse.get_pressed()[0] == 1 and self.content == "double":
+                        for sprite in self.group:
+                            sprite.disable()
+                        game.double()
+                        if game.player_hand.value <= 21:
+                            self.game.dealer_hand.cards[1].set_delay(40)
+                            self.game.dealer_hand.cards[1].toggle_flip()
+                            self.add_delay(80)
+                            self.to_stand = True
+                        else:
+                            self.add_delay(120)                  
+                            self.to_end_busted_round = True
+                            game.hands[0] = player_hand.value
+                            game.hands[1] = dealer_hand.value
 
             else:
                 if self.enabled:
@@ -790,7 +1068,36 @@ class Bet:
         self.chips_group_100 = pygame.sprite.Group()
         self.chips_group_500 = pygame.sprite.Group()
         self.chips_group_1000 = pygame.sprite.Group()
+        self.doubled = False
+        self.chip_double_50 = Chip(50,350,223)
+        self.chip_double_100 = Chip(100,376,223)
+        self.chip_double_500 = Chip(500,402,223)
+        self.chip_double_1000 = Chip(1000,428,223)
         self.display = Display(f"$ {self.value}",font,color,pos_x,pos_y)
+
+    def draw_chips(self):
+        self.chips_group_50.draw(WIN)
+        self.chips_group_50.update()
+        self.chips_group_100.draw(WIN)
+        self.chips_group_100.update()
+        self.chips_group_500.draw(WIN)
+        self.chips_group_500.update()
+        self.chips_group_1000.draw(WIN)
+        self.chips_group_1000.update()
+        self.chip_double_50.update()
+        self.chip_double_100.update()
+        self.chip_double_500.update()
+        self.chip_double_1000.update()
+        if self.doubled:
+            if len(self.chips_group_50) > 0:
+                WIN.blit(self.chip_double_50.image,self.chip_double_50.rect)                
+            if len(self.chips_group_100) > 0:    
+                WIN.blit(self.chip_double_100.image,self.chip_double_100.rect)                
+            if len(self.chips_group_500) > 0:            
+                WIN.blit(self.chip_double_500.image,self.chip_double_500.rect)               
+            if len(self.chips_group_1000) > 0:
+                WIN.blit(self.chip_double_1000.image,self.chip_double_1000.rect)
+                
 
 class Wallet:
     def __init__(self,font,color,pos_x,pos_y):
@@ -887,7 +1194,8 @@ class Game:
         if game.player_hand.value < 21:
             hit_button.enable(100)
             stand_button.enable(100)
-            double_button.enable(100)
+            if wallet.value >= bet.value:
+                double_button.enable(100)
         elif game.player_hand.value == 21:
             hit_button.game.dealer_hand.cards[1].set_delay(40)
             hit_button.game.dealer_hand.cards[1].toggle_flip()
@@ -942,7 +1250,33 @@ class Game:
             self.dealer_hand.rearrange_dealer_hand()
             card_delay += 40
 
-        return card_delay        
+        return card_delay
+
+    def double(self):
+        bet.chip_double_50.teleport()                
+        bet.chip_double_100.teleport()                            
+        bet.chip_double_500.teleport()               
+        bet.chip_double_1000.teleport()
+        card = self.game_stack.draw_card() 
+        card_sprites.add(card)
+        wallet.value -= bet.value
+        wallet.display.add_changes([{"type":"text","value":f"$ {wallet.value}","delay":0}])
+        card.toggle_flip()
+        card.toggle_movement(375 + 18*len(self.player_hand.cards),460 - 20*len(self.player_hand.cards),40)
+        self.player_hand.add_card(card)
+        bet.doubled = True
+        bet.display.change_text(f"$ {bet.value} x2")
+        player_hand_value.add_delay(40)
+        changes = [{"type":"text","value":str(self.player_hand.value),"delay":0}]
+        if self.player_hand.value > 21:
+            changes.append(
+                {
+                    "type":"color",
+                    "value":(255,0,0),
+                    "delay":0
+                }
+            )
+        player_hand_value.add_changes(changes)        
 
     def end_round(self,state:str) -> List[Card]:
         match state:
@@ -1034,14 +1368,7 @@ def main():
             betting_table_sprites.draw(WIN)
             betting_table.draw_chips()
             number_sprites.draw(WIN)
-        bet.chips_group_50.draw(WIN)
-        bet.chips_group_50.update()
-        bet.chips_group_100.draw(WIN)
-        bet.chips_group_100.update()
-        bet.chips_group_500.draw(WIN)
-        bet.chips_group_500.update()
-        bet.chips_group_1000.draw(WIN)
-        bet.chips_group_1000.update()
+        bet.draw_chips()
         button_sprites.draw(WIN)
         button_sprites.update()
         card_sprites.update()
